@@ -51,9 +51,9 @@ router.post("/signup", async (req, res) => {
 
 //for login
 router.post("/login", async (req, res) => {
-
   try {
     const { email, password } = req.body;
+    console.log(req.body);
     if (!email || !password) {
       return res.status(422).json({ error: "please fill the data" });
     }
@@ -69,7 +69,7 @@ router.post("/login", async (req, res) => {
           expires: new Date(Date.now() + 25892000000),
           httpOnly: true,
         });
-      
+        //console.log(userFind);
         res.status(200).json(userFind);
       } else {
         res.status(422).json({ error: "“Invalid Credentials!" });
@@ -80,18 +80,19 @@ router.post("/login", async (req, res) => {
   } catch (err) {
     console.log(err);
   }
-  
 });
 
 router.use(cookieParser());
 
 //for About
 router.get("/about", authenticate, async (req, res) => {
+  console.log("/about is hited");
   res.send(req.rootUser);
 });
 
 //for app.js it's check for user is logged in or not for dispay a logout,login,signup.
 router.get("/check", authenticate, async (req, res) => {
+
   res.send(req.rootUser);
 });
 
@@ -115,15 +116,14 @@ router.post(
   authenticate,
   upload.single("pimage"),
   async (req, res) => {
-    console.log("inbackedn", req.file);
+    console.log("inbackend", req.file);
     const imgUrl = req.file.path;
     const { pname, pprice, pcategory, pdescription } = req.body;
 
-    console.log(pname, pprice, pcategory, pdescription);
-    if (!pname || !pprice || !pcategory || !pdescription || !imgUrl) {
-      return res.status(422).json({ error: "Please fill all the fields" });
-    } else {
-      try {
+    try {
+      if (!pname || !pprice || !pcategory || !pdescription || !imgUrl) {
+        return res.status(422).json({ error: "Please fill all the fields" });
+      } else {
         const newItem = new Item({
           owner: req.userId,
           name: pname,
@@ -134,11 +134,13 @@ router.post(
         });
         const add = await newItem.save();
         if (add) {
-          res.status(201).send(newItem);
+          return res.status(201).send(newItem);
+        } else {
+          return res.status(400).send({ message: "error" });
         }
-      } catch (error) {
-        res.status(400).send({ message: "error" });
       }
+    } catch (error) {
+      res.status(400).send({ message: "error" });
     }
   }
 );
@@ -153,16 +155,15 @@ router.get("/items", async (req, res) => {
   }
 });
 
-
 //Add product to the cart
 router.post("/addcart", authenticate, async (req, res) => {
-  const owner = req.userId;
-  const { itemId, quantity } = req.body;
+  const { owner, itemId, quantity } = req.body;
+  console.log("Owner is : ", owner);
   try {
     const cart = await Cart.findOne({ owner });
     const item = await Item.findOne({ _id: itemId });
-
     if (!item) {
+      console.log("!item");
       res.status(404).send({ message: "item not found" });
       return;
     }
@@ -173,7 +174,7 @@ router.post("/addcart", authenticate, async (req, res) => {
     //if cart already exists for user
     if (cart) {
       const itemIndex = cart.items.findIndex((item) => item.itemId == itemId);
-
+      console.log("itemindex : ",itemIndex);
       //check if product exist or not
       if (itemIndex > -1) {
         let product = cart.items[itemIndex];
@@ -184,14 +185,16 @@ router.post("/addcart", authenticate, async (req, res) => {
 
         cart.items[itemIndex] = product;
         await cart.save();
-        res.status(201).send(cart);
+        console.log("cart is made already");
+        return res.status(201).send(cart);
       } else {
         cart.items.push({ itemId, name, quantity, price });
         cart.bill = cart.items.reduce((acc, curr) => {
           return acc + curr.quantity * curr.price;
         }, 0);
         await cart.save();
-        res.status(201).send(cart);
+        console.log("Product is new");
+        return res.status(201).send(cart);
       }
     } else {
       //no cart exists, create one
@@ -200,127 +203,136 @@ router.post("/addcart", authenticate, async (req, res) => {
         items: [{ itemId, name, quantity, price }],
         bill: quantity * price,
       });
+      console.log("New cart in making");
       return res.status(201).send(newCart);
     }
   } catch (error) {
+    console.log("Something went wrong");
     console.log(error);
-    res.status(500).send("something went wrong");
+    return res.status(500).send("something went wrong");
   }
 });
 
 //get cart items
-router.get("/cart",authenticate,async(req,res)=>{
+router.get("/cart", authenticate, async (req, res) => {
   const owner = req.userId;
-  try{
-      const cart = await Cart.findOne({owner});
-      if(cart && cart.items.length>0){
-        res.status(201).send(cart);
-      }
-      else{
-        res.send(null);
-      }
-      
-  }catch(error){
+  try {
+    const cart = await Cart.findOne({ owner });
+    if (cart && cart.items.length > 0) {
+      res.status(201).send(cart);
+    } else {
+      res.send(null);
+    }
+  } catch (error) {
+    res.status(500).send(error);
+  }
+});
+
+
+// dashboard of seller
+
+router.get("/dashboard",authenticate,async(req,res)=>{
+  const owner = req.userId;
+  try {
+    const items = await Item.find({ owner: owner});
+    res.status(200).json(items);
+  } catch (error) {
     res.status(500).send(error);
   }
 })
 
 //delete item from the cart
-router.delete("/cartdelete",authenticate,async(req,res)=>{
+router.delete("/cartdelete", authenticate, async (req, res) => {
   const owner = req.userId;
   const itemId = req.query.itemId;
-  try{
-    let cart = await Cart.findOne({owner});
-    const itemIndex = cart.items.findIndex((item)=>item.itemId == itemId);
-    if(itemIndex > -1){
+  try {
+    let cart = await Cart.findOne({ owner });
+    const itemIndex = cart.items.findIndex((item) => item.itemId == itemId);
+    if (itemIndex > -1) {
       let item = cart.items[itemIndex];
-      cart.bill -= item.quantity*item.price;
-      if(cart.bill<0){
+      cart.bill -= item.quantity * item.price;
+      if (cart.bill < 0) {
         cart.bill = 0;
       }
-      cart.items.splice(itemIndex,1);
-      cart.bill = cart.items.reduce((acc,curr)=>{
-        return acc+ curr.quantity * curr.price;
-      },0)
+      cart.items.splice(itemIndex, 1);
+      cart.bill = cart.items.reduce((acc, curr) => {
+        return acc + curr.quantity * curr.price;
+      }, 0);
       cart = await cart.save();
 
       res.status(200).send(cart);
-    
-    }else{
-      res.status(400).send({message:"Item is not found"});
+    } else {
+      res.status(400).send({ message: "Item is not found" });
     }
-
-  }catch(error){
+  } catch (error) {
     console.log(error);
-    res.status(400).send({error:"item is not delete"});
+    res.status(400).send({ error: "item is not delete" });
   }
-})
+});
 
 //search product
-router.post("/searchproduct",async(req,res)=>{
-  try{
-  
-    var search  = req.body.search;
-    var product_data = await Item.find({ "name": {$regex:".*"+search+".*",$options:'i'}});
+router.post("/searchproduct", async (req, res) => {
+  try {
+    var search = req.body.search;
+    var product_data = await Item.find({
+      name: { $regex: ".*" + search + ".*", $options: "i" },
+    });
     // var product_data = await Item.find({ "name":search});
-    if(product_data.length > 0){
+    if (product_data.length > 0) {
       res.status(200).send(product_data);
-    }else{
-      res.status(201).send({message:"Product not found"});
+    } else {
+      res.status(201).send({ message: "Product not found" });
     }
-  }catch(error){
-    res.status(400).send({message:"error in searching"});
+  } catch (error) {
+    res.status(400).send({ message: "error in searching" });
   }
-})
+});
 
 //filter items by category
-router.post("/filretbycategory",async(req,res)=>{
+router.post("/filretbycategory", async (req, res) => {
   const category = req.body.cate;
-  try{
-    const items = await Item.find({category});
-    if(items.length === 0){
-      return res.status(404).json({message:"No items found"});
-
+  try {
+    const items = await Item.find({ category });
+    if (items.length === 0) {
+      return res.status(404).json({ message: "No items found" });
     }
     res.status(200).send(items);
-
-  }catch(error){
-    res.status(500).json({message:"server error"});
+  } catch (error) {
+    res.status(500).json({ message: "server error" });
   }
-})
+});
 
 //send a email usinf nodemailer
 const nodemailer = require("nodemailer");
-router.post("/mail",authenticate,async(req,res)=>{
+router.post("/mail", authenticate, async (req, res) => {
   const orderItems = req.body.items;
   const partyEmail = req.rootUser.email;
   const bill = req.body.bill;
   const owner = req.userId;
   // connect with the smtp server
   let transporter = await nodemailer.createTransport({
-    
     service: "gmail",
     auth: {
-      user: 'raoecommerce266@gmail.com',
-      pass: 'rcgmlpfpfokuzlau'
-    }
-  })
+      user: "raoecommerce266@gmail.com",
+      pass: "rcgmlpfpfokuzlau",
+    },
+  });
 
-  let htmlBody ="";
-  Object.keys(orderItems).map((key)=>{
+  let htmlBody = "";
+  Object.keys(orderItems).map((key) => {
     const item = orderItems[key];
     htmlBody += `<tr>
                  <td>${item.name}</td>
                  <td>${item.quantity}</td>
                  <td>${item.price}</td>
-                 <td>${(item.quantity )* (item.price)}</td>
+                 <td>${item.quantity * item.price}</td>
                  </tr>
-                 `;  
+                 `;
   });
 
   let details = {
-    from: 'raoecommerce266@gmail.com',
-    to:partyEmail,
+    from: "raoecommerce266@gmail.com",
+    to: partyEmail,
     subject: "Bill Of Your Order in RaoEcommerce",
     html: `<p>Thank you for your order!</p>
           <p>Here is the summary of your order:</p>
@@ -336,21 +348,20 @@ router.post("/mail",authenticate,async(req,res)=>{
           ${htmlBody}
           </table>
           <h3>Total bill: ${bill} ₹</h3>`,
-  }
-  
-  transporter.sendMail(details,async(err)=>{
-    if(err){
-            res.status(400).json("email not sent!");
-    }else{
-      try{
+  };
+
+  transporter.sendMail(details, async (err) => {
+    if (err) {
+      res.status(400).json("email not sent!");
+    } else {
+      try {
         await Cart.findOneAndDelete({ owner });
         res.status(200).json("email send successfully");
-      }catch(error){
+      } catch (error) {
         res.status(400).json("email not sent!");
       }
-      
     }
-  })
-})
+  });
+});
 
 module.exports = router;
