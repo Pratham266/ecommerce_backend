@@ -3,7 +3,7 @@ const User = require('../modal/userSchema');
 
 const Authenticate = async(req,res,next) =>{
     try{
-        console.log("in middlwate : ",req.cookies.jwtoken);
+        // console.log("in middlwate : ",req.cookies.jwtoken);
         const token =  req.cookies.jwtoken;
         if(token==null){
             return res.status(400).send({message:"user is not login"})

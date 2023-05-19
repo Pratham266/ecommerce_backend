@@ -86,7 +86,6 @@ router.use(cookieParser());
 
 //for About
 router.get("/about", authenticate, async (req, res) => {
-  console.log("/about is hited");
   res.send(req.rootUser);
 });
 
@@ -145,6 +144,36 @@ router.post(
   }
 );
 
+router.put("/updatedata/:itemId", authenticate, upload.single("pimage"), async (req, res) => {
+  const itemId = req.params.itemId;
+  const { pname, pprice, pcategory, pdescription } = req.body;
+
+  try {
+    const item = await Item.findById(itemId);
+    if (!item) {
+      return res.status(404).json({ error: "Item not found" });
+    }
+
+    // Update the item properties
+    item.name = pname;
+    item.price = pprice;
+    item.category = pcategory;
+    item.description = pdescription;
+    
+    // Check if a new image is provided
+    if (req.file) {
+      const imgUrl = req.file.path;
+      item.imageUrl = imgUrl;
+    }
+
+    // Save the updated item
+    const updatedItem = await item.save();
+    res.status(200).json({updatedItem});
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update item" });
+  }
+});
+
 //fetchb all the items from the Item table
 router.get("/items", async (req, res) => {
   try {
@@ -152,6 +181,51 @@ router.get("/items", async (req, res) => {
     res.status(200).send(items);
   } catch (error) {
     res.status(400).send(error);
+  }
+});
+
+//item delete from the application
+router.delete("/itemdelete/:itemId", authenticate, async (req, res) => {
+  const itemId = req.params.itemId;
+  try {
+    const item = await Item.findOne({ _id: itemId });
+    if (!item) {
+      return res.status(404).json({ message: "Item not found" });
+    }
+    await Item.deleteOne({ _id: itemId });
+    res.status(200).json({ message: "Item deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting item" });
+  }
+});
+
+
+//delete item from the cart
+router.delete("/cartdelete", authenticate, async (req, res) => {
+  const owner = req.userId;
+  const itemId = req.query.itemId;
+  try {
+    let cart = await Cart.findOne({ owner });
+    const itemIndex = cart.items.findIndex((item) => item.itemId == itemId);
+    if (itemIndex > -1) {
+      let item = cart.items[itemIndex];
+      cart.bill -= item.quantity * item.price;
+      if (cart.bill < 0) {
+        cart.bill = 0;
+      }
+      cart.items.splice(itemIndex, 1);
+      cart.bill = cart.items.reduce((acc, curr) => {
+        return acc + curr.quantity * curr.price;
+      }, 0);
+      cart = await cart.save();
+
+      res.status(200).send(cart);
+    } else {
+      res.status(400).send({ message: "Item is not found" });
+    }
+  } catch (error) {
+    console.log(error);
+    res.status(400).send({ error: "item is not delete" });
   }
 });
 
@@ -230,7 +304,6 @@ router.get("/cart", authenticate, async (req, res) => {
 
 
 // dashboard of seller
-
 router.get("/dashboard",authenticate,async(req,res)=>{
   const owner = req.userId;
   try {
@@ -241,34 +314,9 @@ router.get("/dashboard",authenticate,async(req,res)=>{
   }
 })
 
-//delete item from the cart
-router.delete("/cartdelete", authenticate, async (req, res) => {
-  const owner = req.userId;
-  const itemId = req.query.itemId;
-  try {
-    let cart = await Cart.findOne({ owner });
-    const itemIndex = cart.items.findIndex((item) => item.itemId == itemId);
-    if (itemIndex > -1) {
-      let item = cart.items[itemIndex];
-      cart.bill -= item.quantity * item.price;
-      if (cart.bill < 0) {
-        cart.bill = 0;
-      }
-      cart.items.splice(itemIndex, 1);
-      cart.bill = cart.items.reduce((acc, curr) => {
-        return acc + curr.quantity * curr.price;
-      }, 0);
-      cart = await cart.save();
 
-      res.status(200).send(cart);
-    } else {
-      res.status(400).send({ message: "Item is not found" });
-    }
-  } catch (error) {
-    console.log(error);
-    res.status(400).send({ error: "item is not delete" });
-  }
-});
+
+
 
 //search product
 router.post("/searchproduct", async (req, res) => {
