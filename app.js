@@ -3,21 +3,7 @@ const bodyParser = require('body-parser');
 require('dotenv').config()
 var cors = require('cors')
 const app = express();
-
-
 require('./database/conn');
-// const mongoose = require('mongoose');
-// mongoose.set('strictQuery',false);
-// mongoose.connect(process.env.MONGO_URI)
-// .then(()=>{
-//     app.listen(process.env.BACKEND_PORT,()=>{
-//         console.log("connect to db & listening on port",process.env.BACKEND_PORT)
-//     })
-// }).catch((error)=>{
-//     console.log(error)
-// })
-
-
 
   app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin',process.env.FRONTEND_URL);

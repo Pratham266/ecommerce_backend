@@ -11,8 +11,7 @@ const Cart = require("../modal/cartSchema");
 
 router.get("/", (req, res, next) => {
   console.log(req.params);
-  res.send({ message: "hii i'm a serve." });
-  console.log("hello pratham");
+  res.send({ message: "Serve is started" });
 });
 
 //for registration
