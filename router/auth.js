@@ -12,6 +12,7 @@ const Cart = require("../modal/cartSchema");
 router.get("/", (req, res, next) => {
   console.log(req.params);
   res.send({ message: "Serve is started" });
+
 });
 
 //for registration
@@ -290,8 +291,8 @@ router.delete("/cartdelete", authenticate, async (req, res) => {
 // });
 
 router.post("/addcart", authenticate, async (req, res) => {
-  const {itemId, quantity } = req.body;
-  const owner = req.userId;
+  const { owner, itemId, quantity } = req.body;
+
   try {
     const item = await Item.findOne({ _id: itemId });
     if (!item) {
