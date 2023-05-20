@@ -290,8 +290,8 @@ router.delete("/cartdelete", authenticate, async (req, res) => {
 // });
 
 router.post("/addcart", authenticate, async (req, res) => {
-  const { owner, itemId, quantity } = req.body;
-
+  const {itemId, quantity } = req.body;
+  const owner = req.userId;
   try {
     const item = await Item.findOne({ _id: itemId });
     if (!item) {
