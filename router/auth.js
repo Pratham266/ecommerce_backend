@@ -91,7 +91,6 @@ router.get("/about", authenticate, async (req, res) => {
 
 //for app.js it's check for user is logged in or not for dispay a logout,login,signup.
 router.get("/check", authenticate, async (req, res) => {
-
   res.send(req.rootUser);
 });
 
@@ -144,35 +143,40 @@ router.post(
   }
 );
 
-router.put("/updatedata/:itemId", authenticate, upload.single("pimage"), async (req, res) => {
-  const itemId = req.params.itemId;
-  const { pname, pprice, pcategory, pdescription } = req.body;
+router.put(
+  "/updatedata/:itemId",
+  authenticate,
+  upload.single("pimage"),
+  async (req, res) => {
+    const itemId = req.params.itemId;
+    const { pname, pprice, pcategory, pdescription } = req.body;
 
-  try {
-    const item = await Item.findById(itemId);
-    if (!item) {
-      return res.status(404).json({ error: "Item not found" });
+    try {
+      const item = await Item.findById(itemId);
+      if (!item) {
+        return res.status(404).json({ error: "Item not found" });
+      }
+
+      // Update the item properties
+      item.name = pname;
+      item.price = pprice;
+      item.category = pcategory;
+      item.description = pdescription;
+
+      // Check if a new image is provided
+      if (req.file) {
+        const imgUrl = req.file.path;
+        item.imageUrl = imgUrl;
+      }
+
+      // Save the updated item
+      const updatedItem = await item.save();
+      res.status(200).json({ updatedItem });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update item" });
     }
-
-    // Update the item properties
-    item.name = pname;
-    item.price = pprice;
-    item.category = pcategory;
-    item.description = pdescription;
-    
-    // Check if a new image is provided
-    if (req.file) {
-      const imgUrl = req.file.path;
-      item.imageUrl = imgUrl;
-    }
-
-    // Save the updated item
-    const updatedItem = await item.save();
-    res.status(200).json({updatedItem});
-  } catch (error) {
-    res.status(500).json({ error: "Failed to update item" });
   }
-});
+);
 
 //fetchb all the items from the Item table
 router.get("/items", async (req, res) => {
@@ -198,7 +202,6 @@ router.delete("/itemdelete/:itemId", authenticate, async (req, res) => {
     res.status(500).json({ message: "Error deleting item" });
   }
 });
-
 
 //delete item from the cart
 router.delete("/cartdelete", authenticate, async (req, res) => {
@@ -230,93 +233,121 @@ router.delete("/cartdelete", authenticate, async (req, res) => {
 });
 
 //Add product to the cart
+// router.post("/addcart", authenticate, async (req, res) => {
+//   const { owner, itemId, quantity } = req.body;
+//   console.log("Owner is : ", owner);
+//   try {
+//     const cart = await Cart.findOne({ owner });
+//     const item = await Item.findOne({ _id: itemId });
+//     if (!item) {
+//       console.log("!item");
+//       res.status(404).send({ message: "item not found" });
+//       return;
+//     }
+
+//     const price = item.price;
+//     const name = item.name;
+
+//     //if cart already exists for user
+//     if (cart) {
+//       const itemIndex = cart.items.findIndex((item) => item.itemId == itemId);
+//       console.log("itemindex : ", itemIndex);
+//       //check if product exist or not
+//       if (itemIndex > -1) {
+//         let product = cart.items[itemIndex];
+//         product.quantity += quantity;
+//         cart.bill = cart.items.reduce((acc, curr) => {
+//           return acc + curr.quantity * curr.price;
+//         }, 0);
+
+//         cart.items[itemIndex] = product;
+//         await cart.save();
+//         console.log("cart is made already");
+//         return res.status(201).send(cart);
+//       } else {
+//         cart.items.push({ itemId, name, quantity, price });
+//         cart.bill = cart.items.reduce((acc, curr) => {
+//           return acc + curr.quantity * curr.price;
+//         }, 0);
+//         await cart.save();
+//         console.log("Product is new");
+//         return res.status(201).send(cart);
+//       }
+//     } else {
+//       //no cart exists, create one
+//       const newCart = await Cart.create({
+//         owner,
+//         items: [{ itemId, name, quantity, price }],
+//         bill: quantity * price,
+//       });
+//       console.log("New cart in making");
+//       return res.status(201).send(newCart);
+//     }
+//   } catch (error) {
+//     console.log("Something went wrong");
+//     console.log(error);
+//     return res.status(500).send("something went wrong");
+//   }
+// });
+
 router.post("/addcart", authenticate, async (req, res) => {
   const { owner, itemId, quantity } = req.body;
-  console.log("Owner is : ", owner);
+
   try {
-    const cart = await Cart.findOne({ owner });
     const item = await Item.findOne({ _id: itemId });
     if (!item) {
-      console.log("!item");
-      res.status(404).send({ message: "item not found" });
-      return;
+      return res.status(404).json({ message: "Item not found" });
     }
 
     const price = item.price;
     const name = item.name;
 
-    //if cart already exists for user
-    if (cart) {
-      const itemIndex = cart.items.findIndex((item) => item.itemId == itemId);
-      console.log("itemindex : ",itemIndex);
-      //check if product exist or not
-      if (itemIndex > -1) {
-        let product = cart.items[itemIndex];
-        product.quantity += quantity;
-        cart.bill = cart.items.reduce((acc, curr) => {
-          return acc + curr.quantity * curr.price;
-        }, 0);
+    const filter = { owner };
+    const update = {
+      $addToSet: {
+        items: { itemId, name, quantity, price }
+      },
+      $inc: { bill: price * quantity }
+    };
 
-        cart.items[itemIndex] = product;
-        await cart.save();
-        console.log("cart is made already");
-        return res.status(201).send(cart);
-      } else {
-        cart.items.push({ itemId, name, quantity, price });
-        cart.bill = cart.items.reduce((acc, curr) => {
-          return acc + curr.quantity * curr.price;
-        }, 0);
-        await cart.save();
-        console.log("Product is new");
-        return res.status(201).send(cart);
-      }
-    } else {
-      //no cart exists, create one
-      const newCart = await Cart.create({
-        owner,
-        items: [{ itemId, name, quantity, price }],
-        bill: quantity * price,
-      });
-      console.log("New cart in making");
-      return res.status(201).send(newCart);
-    }
+    const options = { upsert: true, new: true };
+    const cart = await Cart.findOneAndUpdate(filter, update, options);
+
+    return res.status(201).json(cart);
   } catch (error) {
     console.log("Something went wrong");
     console.log(error);
-    return res.status(500).send("something went wrong");
+    return res.status(500).json({ message: "Something went wrong" });
   }
 });
+
 
 //get cart items
 router.get("/cart", authenticate, async (req, res) => {
   const owner = req.userId;
   try {
     const cart = await Cart.findOne({ owner });
+
     if (cart && cart.items.length > 0) {
       res.status(201).send(cart);
     } else {
-      res.send(null);
+      res.status(200).send({ message: "The cart is empty" });
     }
   } catch (error) {
     res.status(500).send(error);
   }
 });
 
-
 // dashboard of seller
-router.get("/dashboard",authenticate,async(req,res)=>{
+router.get("/dashboard", authenticate, async (req, res) => {
   const owner = req.userId;
   try {
-    const items = await Item.find({ owner: owner});
+    const items = await Item.find({ owner: owner });
     res.status(200).json(items);
   } catch (error) {
     res.status(500).send(error);
   }
-})
-
-
-
-
+});
 
 //search product
 router.post("/searchproduct", async (req, res) => {
