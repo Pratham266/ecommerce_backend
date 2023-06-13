@@ -7,7 +7,6 @@ const Authenticate = async(req,res,next) =>{
         const token =  req.cookies.jwtoken;
         if(token==null){
             return res.status(400).send({message:"user is not login"})
-            
         }else{
         const verfyToken = jwt.verify(token,process.env.TOKEN_PASS);
         const rootUser = await User.findOne({_id:verfyToken._id,"tokens.token":token});

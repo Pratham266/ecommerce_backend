@@ -5,13 +5,14 @@ var cors = require('cors')
 const app = express();
 require('./database/conn');
 
-  app.use((req, res, next) => {
+app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin',process.env.FRONTEND_URL);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     next();
-  });
+});
+
 
 app.use(cors({
   origin: process.env.FRONTEND_URL,
